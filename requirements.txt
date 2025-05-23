@@ -1,0 +1,7 @@
+EbookLib==0.19
+PyPDF2==3.0.1
+gTTS==2.5.4
+BeautifulSoup4==4.13.4
+lxml==5.4.0
+# For test suite (creating sample PDFs)
+reportlab==4.4.1

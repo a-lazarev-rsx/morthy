@@ -1,3 +1,12 @@
+"""
+Parser module for extracting text content from various book file formats.
+
+This module provides functions to extract plain text from EPUB, PDF, and
+(partially implemented) FB2 files. Each function handles a specific file
+type, including error handling for common issues like file not found or
+corrupted files.
+"""
+
 import ebooklib
 from ebooklib import epub
 from bs4 import BeautifulSoup
