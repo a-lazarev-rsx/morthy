@@ -1,6 +1,6 @@
-# Audiobook Generator
+# Morthy - Audiobook Generator
 
-A command-line tool to convert book files (currently EPUB and PDF) into MP3 audiobooks using Text-to-Speech (TTS).
+Morthy is a command-line tool to convert book files (currently EPUB and PDF) into MP3 audiobooks using Text-to-Speech (TTS).
 
 ## Features
 

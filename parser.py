@@ -6,7 +6,6 @@ This module provides functions to extract plain text from EPUB, PDF, and
 type, including error handling for common issues like file not found or
 corrupted files.
 """
-
 import ebooklib
 from ebooklib import epub
 from bs4 import BeautifulSoup
