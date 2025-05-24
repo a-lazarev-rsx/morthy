@@ -1,0 +1,12 @@
+<!doctype html>
+<title>Conversion Result</title>
+<body>
+    {% if success %}
+        <h1>Audiobook generated successfully!</h1>
+        <p><a href="{{ url_for('download_file', filename=filename) }}">Download MP3</a></p>
+    {% else %}
+        <h1>Error</h1>
+        <p>{{ error_message }}</p>
+    {% endif %}
+    <p><a href="{{ url_for('upload_page') }}">Upload another file</a></p>
+</body>
