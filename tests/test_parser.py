@@ -157,5 +157,130 @@ class TestPdfParser(unittest.TestCase):
 # 3. Test non-existent FB2.
 # 4. Test malformed FB2.
 
+import tempfile
+import shutil
+
+class TestFB2Parser(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        # Use a dedicated temp directory for FB2 test files
+        cls.test_dir = tempfile.mkdtemp(prefix="fb2_tests_")
+
+        cls.sample_fb2_path = os.path.join(cls.test_dir, "sample.fb2")
+        cls.no_body_fb2_path = os.path.join(cls.test_dir, "no_body.fb2")
+        cls.empty_body_fb2_path = os.path.join(cls.test_dir, "empty_body.fb2")
+        cls.special_chars_fb2_path = os.path.join(cls.test_dir, "special_chars.fb2")
+        cls.malformed_xml_path = os.path.join(cls.test_dir, "malformed.xml.fb2") # .fb2 to be picked by parser
+        cls.non_fb2_path = os.path.join(cls.test_dir, "plain.txt")
+
+        with open(cls.sample_fb2_path, "w", encoding="utf-8") as f:
+            f.write(cls._create_sample_fb2_basic_content())
+        with open(cls.no_body_fb2_path, "w", encoding="utf-8") as f:
+            f.write(cls._create_sample_fb2_no_body_content())
+        with open(cls.empty_body_fb2_path, "w", encoding="utf-8") as f:
+            f.write(cls._create_sample_fb2_empty_body_content())
+        with open(cls.special_chars_fb2_path, "w", encoding="utf-8") as f:
+            f.write(cls._create_sample_fb2_special_chars_content())
+        with open(cls.malformed_xml_path, "w", encoding="utf-8") as f:
+            f.write(cls._create_malformed_xml_content())
+        with open(cls.non_fb2_path, "w", encoding="utf-8") as f:
+            f.write("This is a plain text file, not FB2 or XML.")
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.test_dir)
+
+    @staticmethod
+    def _create_sample_fb2_basic_content():
+        return """<?xml version="1.0" encoding="utf-8"?>
+<FictionBook xmlns="http://www.gribuser.ru/xml/fictionbook/2.0">
+<description><title-info><book-title>Test Book</book-title></title-info></description>
+<body>
+    <section><title><p>Chapter 1</p></title>
+        <p>This is paragraph one.</p>
+        <p>This is paragraph two with <em>emphasis</em>.</p>
+    </section>
+    <section><title><p>Chapter 2</p></title>
+        <p>Another paragraph.</p>
+    </section>
+</body>
+</FictionBook>"""
+
+    @staticmethod
+    def _create_sample_fb2_no_body_content():
+        return """<?xml version="1.0" encoding="utf-8"?>
+<FictionBook xmlns="http://www.gribuser.ru/xml/fictionbook/2.0">
+<description><title-info><book-title>No Body Book</book-title></title-info></description>
+</FictionBook>"""
+
+    @staticmethod
+    def _create_sample_fb2_empty_body_content():
+        return """<?xml version="1.0" encoding="utf-8"?>
+<FictionBook xmlns="http://www.gribuser.ru/xml/fictionbook/2.0">
+<description><title-info><book-title>Empty Body Book</book-title></title-info></description>
+<body></body>
+</FictionBook>"""
+
+    @staticmethod
+    def _create_sample_fb2_special_chars_content():
+        return """<?xml version="1.0" encoding="utf-8"?>
+<FictionBook xmlns="http://www.gribuser.ru/xml/fictionbook/2.0">
+<description><title-info><book-title>Special Chars Book</book-title></title-info></description>
+<body>
+    <section><p>Text with &lt;less than&gt; and &amp;ampersand&amp;.</p>
+        <p>Some <strong>bold</strong> and <em>italic</em> text.</p>
+        <p>A line with preserved spaces:  A  B  C  </p>
+        <p>A\nnewline character (should become space).</p>
+    </section>
+</body>
+</FictionBook>"""
+# Note: The current parser implementation normalizes spaces, so "A  B  C" -> "A B C"
+# and "\n" -> " ".
+
+    @staticmethod
+    def _create_malformed_xml_content():
+        return """<?xml version="1.0" encoding="utf-8"?>
+<FictionBook xmlns="http://www.gribuser.ru/xml/fictionbook/2.0">
+<body>
+    <section><p>This is a malformed XML because of a missing closing tag.
+</FictionBook>""" # Missing </p> and </section>
+
+    def test_extract_text_from_valid_fb2(self):
+        expected_text = "Chapter 1 This is paragraph one. This is paragraph two with emphasis. Chapter 2 Another paragraph."
+        text = extract_text_from_fb2(self.sample_fb2_path)
+        self.assertEqual(text, expected_text)
+
+    def test_extract_text_no_body(self):
+        text = extract_text_from_fb2(self.no_body_fb2_path)
+        self.assertEqual(text, "Info: FB2 file has no body content or body tag is not standard.")
+
+    def test_extract_text_empty_body(self):
+        text = extract_text_from_fb2(self.empty_body_fb2_path)
+        self.assertEqual(text, "Info: FB2 body was found, but no text content was extracted from it.")
+
+    def test_extract_text_special_chars(self):
+        # Based on current parser: string(.//text()) and then ' '.join(text.split())
+        # "Text with <less than> and &ampersand&." -> "Text with <less than> and &ampersand&." (XML entities are resolved by parser)
+        # "Some bold and italic text."
+        # "A line with preserved spaces:  A  B  C" -> "A line with preserved spaces: A B C"
+        # "A newline character (should become space)." -> "A newline character (should become space)."
+        expected_text = "Text with <less than> and &ampersand&. Some bold and italic text. A line with preserved spaces: A B C A newline character (should become space)."
+        text = extract_text_from_fb2(self.special_chars_fb2_path)
+        self.assertEqual(text, expected_text)
+
+    def test_extract_text_from_non_fb2_file(self):
+        # This will raise XMLSyntaxError because plain text is not valid XML
+        text = extract_text_from_fb2(self.non_fb2_path)
+        self.assertTrue(text.startswith("Error: Invalid or corrupted FB2 file. XMLSyntaxError:"), f"Unexpected message: {text}")
+
+    def test_extract_text_file_not_found(self):
+        text = extract_text_from_fb2("non_existent_file.fb2")
+        self.assertEqual(text, "Error: FB2 file not found at path: non_existent_file.fb2")
+
+    def test_extract_text_malformed_xml(self):
+        text = extract_text_from_fb2(self.malformed_xml_path)
+        self.assertTrue(text.startswith("Error: Invalid or corrupted FB2 file. XMLSyntaxError:"), f"Unexpected message: {text}")
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -4,7 +4,7 @@ Morthy is a command-line tool to convert book files (currently EPUB and PDF) int
 
 ## Features
 
-*   Supports EPUB (.epub) and PDF (.pdf) file formats.
+*   Supports EPUB (.epub), PDF (.pdf), and FB2 (.fb2) file formats.
 *   Converts extracted text to speech using Google Text-to-Speech (gTTS).
 *   Allows specifying output MP3 filename.
 *   Allows specifying the language for TTS.
@@ -19,8 +19,9 @@ The following Python libraries are required:
 *   `PyPDF2>=3.0.1` (for PDF parsing)
 *   `gTTS>=2.5.4` (for Text-to-Speech)
 *   `BeautifulSoup4>=4.13.4` (for HTML processing in EPUBs)
-*   `lxml>=5.4.0` (XML processing, often a dependency for EbookLib)
+*   `lxml>=5.4.0` (for XML processing, including FB2 parsing)
 *   `reportlab>=4.4.1` (for creating sample PDFs in the test suite)
+*   `FB2==0.2.1` (listed in requirements, though current FB2 parsing relies on lxml)
 
 ## Installation
 
@@ -43,7 +44,7 @@ python main.py <input_file> [--output_file <output_name.mp3>] [--lang <language_
 
 **Arguments:**
 
-*   `input_file`: (Required) Path to the input book file. Supported formats: `.epub`, `.pdf`.
+*   `input_file`: (Required) Path to the input book file. Supported formats: `.epub`, `.pdf`, `.fb2`.
 *   `--output_file`: (Optional) Desired name for the output MP3 file. If not provided, it defaults to the input file name with an `.mp3` extension (e.g., `mybook.epub` becomes `mybook.mp3`).
 *   `--lang`: (Optional) Language code for the text-to-speech conversion (e.g., 'en' for English, 'es' for Spanish). Defaults to 'en'.
 
@@ -60,12 +61,17 @@ python main.py <input_file> [--output_file <output_name.mp3>] [--lang <language_
     python main.py "My Document.pdf" --output_file "audio_doc.mp3" --lang es
     ```
 
+3.  **Convert an FB2 file with default settings:**
+    ```bash
+    python main.py "story.fb2"
+    ```
+    *(Output will be `story.mp3`)*
+
 **Supported Formats:**
 
 *   EPUB (.epub)
 *   PDF (.pdf)
-
-*Note: FB2 (.fb2) support was initially planned and has partial implementation in `parser.py` but is currently non-functional due to unresolved library import issues for the `fb2` package. It is considered a feature for future improvement.*
+*   FB2 (.fb2) - Parsed using `lxml`.
 
 ## Error Handling
 

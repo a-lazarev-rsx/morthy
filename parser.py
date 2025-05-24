@@ -2,9 +2,8 @@
 Parser module for extracting text content from various book file formats.
 
 This module provides functions to extract plain text from EPUB, PDF, and
-(partially implemented) FB2 files. Each function handles a specific file
-type, including error handling for common issues like file not found or
-corrupted files.
+FB2 files. Each function handles a specific file type, including error
+handling for common issues like file not found or corrupted files.
 """
 import ebooklib
 from ebooklib import epub
@@ -47,52 +46,55 @@ def extract_text_from_fb2(filepath):
         str: The extracted text content, or an error message if extraction fails.
     """
     try:
-        # Attempt to import the fb2 library and its necessary components.
-        # The common import path found in documentation for 'python-fb2' or 'fb2'
-        # is often related to an FB2Tree or similar parser object.
-        from fb2 import FB2TreeV2 # Trying FB2TreeV2 as seen in some versions/forks
-                                 # or use 'from fb2.fb2 import FB2Tree' if that's standard for your installed lib
-                                 # This is the most likely point of failure if the library is not found or structured differently.
-    except ImportError:
-        return "Error: fb2 library not found or FB2TreeV2 (or FB2Tree) class not found within it. Please install/check the library (e.g., pip install fb2 or python-fb2)."
+        from lxml import etree  # Import lxml
 
-    try:
-        # Open the FB2 file in binary read mode, as it's XML-based.
         with open(filepath, 'rb') as fb2_file:
-            # Parse the FB2 file using the imported tree object.
-            # The exact instantiation might vary (e.g., FB2Tree(file_obj) or FB2Tree.parse(file_obj))
-            # For the fb2 package (0.2.1), it's typically FB2Tree(file_obj).
-            # Let's stick to FB2Tree for now as it's more common with the base 'fb2' package.
-            from fb2.fb2 import FB2Tree # Re-affirming the more standard import for the parsing part.
-            tree = FB2Tree(fb2_file)
+            fb2_content = fb2_file.read()
 
-        # The main content is usually within the <body> of an FB2 file.
-        body = tree.get_body()
-        if not body:
-            return "Error: FB2 file has no body content."
+        # Parse the XML content
+        tree = etree.fromstring(fb2_content)
 
-        # The fb2 library (especially version 0.2.1 which uses lxml)
-        # typically provides a way to get the raw XML of elements.
-        # We can then use BeautifulSoup to robustly extract all text, stripping XML tags.
-        if hasattr(body, 'raw_xml'):
-            # body.raw_xml() should give the XML string of the <body> element.
-            soup = BeautifulSoup(body.raw_xml(), 'xml') # Use the 'xml' parser for FB2
-            extracted_text = soup.get_text(separator='\n', strip=True)
-            if extracted_text:
-                return extracted_text
-            else:
-                return "Info: FB2 body was parsed, but no text content was found after stripping tags."
+        # Define the FB2 namespace
+        ns = {'fb': 'http://www.gribuser.ru/xml/fictionbook/2.0'}
+
+        # Find the <body> element
+        body_element = tree.find('fb:body', namespaces=ns)
+
+        if body_element is None:
+            # Try finding body without namespace as some files might not declare it explicitly
+            # or might use a default namespace that lxml handles differently without explicit ns map.
+            body_element = tree.find('body')
+            if body_element is None:
+                return "Info: FB2 file has no body content or body tag is not standard."
+
+        # Extract all text content from within the body element using XPath.
+        # The XPath `string(.//text())` concatenates all descendant text nodes of the body_element.
+        # This is efficient for grabbing all text, regardless of sub-element structure (e.g., <p>, <section>, <title>).
+        extracted_text = body_element.xpath("string(.//text())")
+        
+        # Normalize whitespace. The text extracted by XPath string(.//text()) might have
+        # inconsistent spacing, multiple newlines, or leading/trailing spaces.
+        # ' '.join(extracted_text.split()) collapses all contiguous whitespace
+        # (including newlines, tabs, multiple spaces) into single spaces.
+        if extracted_text:
+            normalized_text = ' '.join(extracted_text.split())
+            # Note: This normalization means that multiple spaces or newlines that might
+            # visually separate paragraphs in the raw FB2 text will be converted to single spaces.
+            # If distinct paragraph separation is critical beyond sentence structure,
+            # a more complex iteration over paragraph tags (e.g., <p>) would be required.
+            # However, for general text content extraction, this method is robust.
+            return normalized_text.strip() # .strip() to remove any leading/trailing space after join.
         else:
-            # Fallback if raw_xml() is not available (less likely for fb2 0.2.1)
-            # This would require more specific knowledge of the library's element structure.
-            # For now, we'll indicate that the primary method failed.
-            return "Error: FB2 library's body object does not support 'raw_xml()' for text extraction. Cannot extract text."
+            return "Info: FB2 body was found, but no text content was extracted from it."
 
     except FileNotFoundError:
-        return "Error: FB2 file not found at path: " + filepath
+        return f"Error: FB2 file not found at path: {filepath}"
+    except etree.XMLSyntaxError as e:
+        return f"Error: Invalid or corrupted FB2 file. XMLSyntaxError: {e}"
+    except ImportError:
+        # This handles the case where lxml is not installed, though it should be.
+        return "Error: lxml library not found. Please install it (e.g., pip install lxml)."
     except Exception as e:
-        # Catching a broader range of exceptions that might occur during parsing
-        # (e.g., XML parsing errors within the fb2 library, unexpected file structure).
         return f"An unexpected error occurred during FB2 parsing: {e}"
 
 def extract_text_from_pdf(filepath):
