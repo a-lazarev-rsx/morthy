@@ -91,6 +91,49 @@ You can then upload your book files (supported formats: EPUB, PDF, FB2) through 
 
 *Note: FB2 (.fb2) support was initially planned and has partial implementation in `parser.py` but is currently non-functional due to unresolved library import issues for the `fb2` package. It is considered a feature for future improvement.*
 
+## New React Frontend (Vite + Tailwind + shadcn/ui)
+
+This project now includes a modern React frontend application built with Vite, Tailwind CSS, and shadcn/ui components.
+
+### Frontend Setup and Usage
+
+To run the new React frontend, follow these steps:
+
+1.  **Navigate to the frontend directory:**
+    Open your terminal and change to the frontend project's directory:
+    ```bash
+    cd frontend/vite-react-app
+    ```
+
+2.  **Install Dependencies:**
+    If you haven't already, or if dependencies have changed, install the necessary Node.js packages:
+    ```bash
+    npm install
+    ```
+    *Note: If you encounter peer dependency issues, especially with React 19, you might need to use the `--legacy-peer-deps` flag:*
+    ```bash
+    npm install --legacy-peer-deps
+    ```
+
+3.  **Run the Development Server:**
+    Once the dependencies are installed, you can start the Vite development server:
+    ```bash
+    npm run dev
+    ```
+    This command will typically start the server and make the application available at `http://localhost:5173` (the port may vary if 5173 is in use). Your terminal will display the correct address.
+
+4.  **Access the Application:**
+    Open your web browser and navigate to the address shown in your terminal (e.g., `http://localhost:5173`).
+
+### Technology Stack
+
+The frontend application utilizes the following technologies:
+
+*   **React:** A JavaScript library for building user interfaces.
+*   **Vite:** A fast build tool and development server for modern web projects.
+*   **Tailwind CSS:** A utility-first CSS framework for rapid UI development.
+*   **shadcn/ui:** A collection of beautifully designed, accessible, and customizable React components.
+
 ## Error Handling
 
 The script includes handling for common errors such as:
