@@ -60,6 +60,30 @@ python main.py <input_file> [--output_file <output_name.mp3>] [--lang <language_
     python main.py "My Document.pdf" --output_file "audio_doc.mp3" --lang es
     ```
 
+## Running the Web Application
+
+This project also includes a web interface for converting books to audiobooks.
+
+1.  **Install Dependencies:**
+    Ensure all dependencies, including Flask (which is now part of `requirements.txt`), are installed:
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+2.  **Run the Web Application:**
+    Navigate to the project's root directory and run:
+    ```bash
+    python web_app.py
+    ```
+
+3.  **Access the Application:**
+    Open your web browser and go to:
+    ```
+    http://127.0.0.1:5000/
+    ```
+
+You can then upload your book files (supported formats: EPUB, PDF, FB2) through the web interface to convert them into audio.
+
 **Supported Formats:**
 
 *   EPUB (.epub)
