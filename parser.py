@@ -8,6 +8,9 @@ handling for common issues like file not found or corrupted files.
 import ebooklib
 from ebooklib import epub
 from bs4 import BeautifulSoup
+import re
+import sys
+import traceback
 
 def extract_text_from_epub(filepath):
     """
@@ -37,7 +40,8 @@ def extract_text_from_epub(filepath):
 
 def extract_text_from_fb2(filepath):
     """
-    Extracts text content from an FB2 file.
+    Extracts structured text content from an FB2 file using a recursive approach.
+    It attempts to preserve paragraph and section structure with newlines.
 
     Args:
         filepath (str): The path to the FB2 file.
@@ -57,35 +61,100 @@ def extract_text_from_fb2(filepath):
         # Define the FB2 namespace
         ns = {'fb': 'http://www.gribuser.ru/xml/fictionbook/2.0'}
 
-        # Find the <body> element
+        # Find the <body> element using the standard namespace
         body_element = tree.find('fb:body', namespaces=ns)
 
         if body_element is None:
-            # Try finding body without namespace as some files might not declare it explicitly
-            # or might use a default namespace that lxml handles differently without explicit ns map.
-            body_element = tree.find('body')
-            if body_element is None:
+            # If not found, try a namespace-agnostic XPath
+            body_elements = tree.xpath('//*[local-name()="body"]')
+            if body_elements:
+                body_element = body_elements[0]
+            else:
+                # If still not found after both attempts
                 return "Info: FB2 file has no body content or body tag is not standard."
 
-        # Extract all text content from within the body element using XPath.
-        # The XPath `string(.//text())` concatenates all descendant text nodes of the body_element.
-        # This is efficient for grabbing all text, regardless of sub-element structure (e.g., <p>, <section>, <title>).
-        extracted_text = body_element.xpath("string(.//text())")
         
-        # Normalize whitespace. The text extracted by XPath string(.//text()) might have
-        # inconsistent spacing, multiple newlines, or leading/trailing spaces.
-        # ' '.join(extracted_text.split()) collapses all contiguous whitespace
-        # (including newlines, tabs, multiple spaces) into single spaces.
+        text_parts = []
+
+        
+        text_parts = []
+
+        # Inner recursive function to process each element and its children
+        def process_element(element, current_text_parts):
+            if element is None:
+                return
+
+            tag_name = etree.QName(element.tag).localname
+
+            if tag_name == 'p':
+                # Paragraphs: extract text, strip surrounding whitespace, append with a single newline.
+                # Text from inline tags (<em>, <strong>, <a>, etc.) is included.
+                para_text = element.xpath("string(.//text())") 
+                if para_text: 
+                    stripped_text = para_text.strip()
+                    if stripped_text:
+                        current_text_parts.append(stripped_text)
+                        current_text_parts.append('\n')
+            elif tag_name == 'title':
+                # Titles: extract text, strip, append with two newlines for separation.
+                title_text = element.xpath("string(.//text())")
+                if title_text:
+                    stripped_text = title_text.strip()
+                    if stripped_text:
+                        current_text_parts.append(stripped_text)
+                        current_text_parts.append('\n\n')
+            elif tag_name == 'section':
+                # Sections: manage spacing before and after their content.
+                # Ensure a double newline before starting a new section if not already present.
+                if current_text_parts and not "".join(current_text_parts[-2:]).endswith('\n\n'):
+                    if not "".join(current_text_parts[-1:]).endswith('\n'):
+                        current_text_parts.append('\n')
+                    current_text_parts.append('\n')
+
+                for child in element: # Recursively process children of the section
+                    process_element(child, current_text_parts)
+                
+                # Ensure a double newline after the section content if not already present.
+                if current_text_parts and not "".join(current_text_parts[-2:]).endswith('\n\n'):
+                    if not "".join(current_text_parts[-1:]).endswith('\n'):
+                        current_text_parts.append('\n')
+                    current_text_parts.append('\n')
+            elif tag_name == 'empty-line':
+                # Empty lines: append a single newline.
+                current_text_parts.append('\n')
+            elif tag_name in ['epigraph', 'cite', 'poem', 'subtitle']:
+                # Other block elements: extract text, strip, ensure double newline separation.
+                block_text = element.xpath("string(.//text())")
+                if block_text:
+                    stripped_text = block_text.strip()
+                    if stripped_text:
+                        if current_text_parts and not "".join(current_text_parts[-2:]).endswith('\n\n'):
+                            if not "".join(current_text_parts[-1:]).endswith('\n'): current_text_parts.append('\n')
+                            current_text_parts.append('\n')
+                        
+                        current_text_parts.append(stripped_text)
+                        current_text_parts.append('\n\n')
+            else:
+                # Default: For other elements (e.g., <body> itself, or other containers),
+                # recursively process their children without adding specific formatting at this level.
+                for child in element:
+                    process_element(child, current_text_parts)
+
+        # Start the recursive processing from the found <body> element
+        process_element(body_element, text_parts)
+
+        # Join all collected text parts
+        extracted_text = "".join(text_parts)
+
+        # Normalize newlines: replace sequences of 3 or more newlines with exactly two.
+        # Also, strip any leading/trailing whitespace from the final text.
         if extracted_text:
-            normalized_text = ' '.join(extracted_text.split())
-            # Note: This normalization means that multiple spaces or newlines that might
-            # visually separate paragraphs in the raw FB2 text will be converted to single spaces.
-            # If distinct paragraph separation is critical beyond sentence structure,
-            # a more complex iteration over paragraph tags (e.g., <p>) would be required.
-            # However, for general text content extraction, this method is robust.
-            return normalized_text.strip() # .strip() to remove any leading/trailing space after join.
-        else:
+            extracted_text = re.sub(r'\n{3,}', '\n\n', extracted_text)
+            extracted_text = extracted_text.strip() 
+
+        if not extracted_text: # If after all processing, the text is empty
             return "Info: FB2 body was found, but no text content was extracted from it."
+        return extracted_text
 
     except FileNotFoundError:
         return f"Error: FB2 file not found at path: {filepath}"
@@ -95,6 +164,9 @@ def extract_text_from_fb2(filepath):
         # This handles the case where lxml is not installed, though it should be.
         return "Error: lxml library not found. Please install it (e.g., pip install lxml)."
     except Exception as e:
+        print("\n--- Traceback for unexpected error in extract_text_from_fb2 ---", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
+        print("--- End Traceback ---", file=sys.stderr)
         return f"An unexpected error occurred during FB2 parsing: {e}"
 
 def extract_text_from_pdf(filepath):

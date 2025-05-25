@@ -172,6 +172,7 @@ class TestFB2Parser(unittest.TestCase):
         cls.special_chars_fb2_path = os.path.join(cls.test_dir, "special_chars.fb2")
         cls.malformed_xml_path = os.path.join(cls.test_dir, "malformed.xml.fb2") # .fb2 to be picked by parser
         cls.non_fb2_path = os.path.join(cls.test_dir, "plain.txt")
+        cls.cp1251_fb2_path = os.path.join(cls.test_dir, "sample_cp1251.fb2")
 
         with open(cls.sample_fb2_path, "w", encoding="utf-8") as f:
             f.write(cls._create_sample_fb2_basic_content())
@@ -185,6 +186,16 @@ class TestFB2Parser(unittest.TestCase):
             f.write(cls._create_malformed_xml_content())
         with open(cls.non_fb2_path, "w", encoding="utf-8") as f:
             f.write("This is a plain text file, not FB2 or XML.")
+        
+        # Create windows-1251 encoded file
+        cp1251_content_str = """<?xml version="1.0" encoding="windows-1251"?>
+<FictionBook xmlns="http://www.gribuser.ru/xml/fictionbook/2.0">
+<body>
+    <p>Привет мир</p>
+</body>
+</FictionBook>"""
+        with open(cls.cp1251_fb2_path, "wb") as f: # Write in binary mode
+            f.write(cp1251_content_str.encode("windows-1251"))
 
     @classmethod
     def tearDownClass(cls):
@@ -246,7 +257,14 @@ class TestFB2Parser(unittest.TestCase):
 </FictionBook>""" # Missing </p> and </section>
 
     def test_extract_text_from_valid_fb2(self):
-        expected_text = "Chapter 1 This is paragraph one. This is paragraph two with emphasis. Chapter 2 Another paragraph."
+        # Expected output based on new structured parsing:
+        # Titles get \n\n, paragraphs get \n. Sections manage spacing around them.
+        # Normalization will ensure max \n\n.
+        expected_text = ("Chapter 1\n\n"
+                         "This is paragraph one.\n"
+                         "This is paragraph two with emphasis.\n\n" # End of section 1, start of section 2
+                         "Chapter 2\n\n"
+                         "Another paragraph.") # Final .strip() removes trailing \n from last <p> if no more content
         text = extract_text_from_fb2(self.sample_fb2_path)
         self.assertEqual(text, expected_text)
 
@@ -259,12 +277,15 @@ class TestFB2Parser(unittest.TestCase):
         self.assertEqual(text, "Info: FB2 body was found, but no text content was extracted from it.")
 
     def test_extract_text_special_chars(self):
-        # Based on current parser: string(.//text()) and then ' '.join(text.split())
-        # "Text with <less than> and &ampersand&." -> "Text with <less than> and &ampersand&." (XML entities are resolved by parser)
-        # "Some bold and italic text."
-        # "A line with preserved spaces:  A  B  C" -> "A line with preserved spaces: A B C"
-        # "A newline character (should become space)." -> "A newline character (should become space)."
-        expected_text = "Text with <less than> and &ampersand&. Some bold and italic text. A line with preserved spaces: A B C A newline character (should become space)."
+        # Expected output based on new structured parsing:
+        # Each <p> content is stripped and gets a \n.
+        # XML entities are resolved by lxml.
+        # Internal newlines within <p> are converted to spaces by .xpath("string(.//text())").strip()
+        # The section adds \n\n at its end, but .strip() on the final result removes it if it's trailing.
+        expected_text = ("Text with <less than> and &ampersand&.\n"
+                         "Some bold and italic text.\n"
+                         "A line with preserved spaces: A B C\n" # Preserved spaces within <p> are normalized by strip()
+                         "A newline character (should become space).") # \n within text node becomes space
         text = extract_text_from_fb2(self.special_chars_fb2_path)
         self.assertEqual(text, expected_text)
 
@@ -280,6 +301,13 @@ class TestFB2Parser(unittest.TestCase):
     def test_extract_text_malformed_xml(self):
         text = extract_text_from_fb2(self.malformed_xml_path)
         self.assertTrue(text.startswith("Error: Invalid or corrupted FB2 file. XMLSyntaxError:"), f"Unexpected message: {text}")
+
+    def test_extract_text_from_windows1251_fb2(self):
+        # lxml should handle XML-declared encodings.
+        # The parser extracts text from <p> and adds a newline.
+        expected_text = "Привет мир" # The final .strip() in the main function removes the trailing \n
+        text = extract_text_from_fb2(self.cp1251_fb2_path)
+        self.assertEqual(text, expected_text)
 
 
 if __name__ == '__main__':

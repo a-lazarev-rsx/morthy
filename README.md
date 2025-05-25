@@ -5,6 +5,7 @@ Morthy is a command-line tool to convert book files (currently EPUB and PDF) int
 ## Features
 
 *   Supports EPUB (.epub), PDF (.pdf), and FB2 (.fb2) file formats.
+*   Extracts text preserving basic paragraph and section structure (especially for FB2).
 *   Converts extracted text to speech using Google Text-to-Speech (gTTS).
 *   Allows specifying output MP3 filename.
 *   Allows specifying the language for TTS.
