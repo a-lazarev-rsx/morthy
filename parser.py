@@ -2,13 +2,15 @@
 Parser module for extracting text content from various book file formats.
 
 This module provides functions to extract plain text from EPUB, PDF, and
-(partially implemented) FB2 files. Each function handles a specific file
-type, including error handling for common issues like file not found or
-corrupted files.
+FB2 files. Each function handles a specific file type, including error
+handling for common issues like file not found or corrupted files.
 """
 import ebooklib
 from ebooklib import epub
 from bs4 import BeautifulSoup
+import re
+import sys
+import traceback
 
 def extract_text_from_epub(filepath):
     """
@@ -38,7 +40,8 @@ def extract_text_from_epub(filepath):
 
 def extract_text_from_fb2(filepath):
     """
-    Extracts text content from an FB2 file.
+    Extracts structured text content from an FB2 file using a recursive approach.
+    It attempts to preserve paragraph and section structure with newlines.
 
     Args:
         filepath (str): The path to the FB2 file.
@@ -47,52 +50,123 @@ def extract_text_from_fb2(filepath):
         str: The extracted text content, or an error message if extraction fails.
     """
     try:
-        # Attempt to import the fb2 library and its necessary components.
-        # The common import path found in documentation for 'python-fb2' or 'fb2'
-        # is often related to an FB2Tree or similar parser object.
-        from fb2 import FB2TreeV2 # Trying FB2TreeV2 as seen in some versions/forks
-                                 # or use 'from fb2.fb2 import FB2Tree' if that's standard for your installed lib
-                                 # This is the most likely point of failure if the library is not found or structured differently.
-    except ImportError:
-        return "Error: fb2 library not found or FB2TreeV2 (or FB2Tree) class not found within it. Please install/check the library (e.g., pip install fb2 or python-fb2)."
+        from lxml import etree  # Import lxml
 
-    try:
-        # Open the FB2 file in binary read mode, as it's XML-based.
         with open(filepath, 'rb') as fb2_file:
-            # Parse the FB2 file using the imported tree object.
-            # The exact instantiation might vary (e.g., FB2Tree(file_obj) or FB2Tree.parse(file_obj))
-            # For the fb2 package (0.2.1), it's typically FB2Tree(file_obj).
-            # Let's stick to FB2Tree for now as it's more common with the base 'fb2' package.
-            from fb2.fb2 import FB2Tree # Re-affirming the more standard import for the parsing part.
-            tree = FB2Tree(fb2_file)
+            fb2_content = fb2_file.read()
 
-        # The main content is usually within the <body> of an FB2 file.
-        body = tree.get_body()
-        if not body:
-            return "Error: FB2 file has no body content."
+        # Parse the XML content
+        tree = etree.fromstring(fb2_content)
 
-        # The fb2 library (especially version 0.2.1 which uses lxml)
-        # typically provides a way to get the raw XML of elements.
-        # We can then use BeautifulSoup to robustly extract all text, stripping XML tags.
-        if hasattr(body, 'raw_xml'):
-            # body.raw_xml() should give the XML string of the <body> element.
-            soup = BeautifulSoup(body.raw_xml(), 'xml') # Use the 'xml' parser for FB2
-            extracted_text = soup.get_text(separator='\n', strip=True)
-            if extracted_text:
-                return extracted_text
+        # Define the FB2 namespace
+        ns = {'fb': 'http://www.gribuser.ru/xml/fictionbook/2.0'}
+
+        # Find the <body> element using the standard namespace
+        body_element = tree.find('fb:body', namespaces=ns)
+
+        if body_element is None:
+            # If not found, try a namespace-agnostic XPath
+            body_elements = tree.xpath('//*[local-name()="body"]')
+            if body_elements:
+                body_element = body_elements[0]
             else:
-                return "Info: FB2 body was parsed, but no text content was found after stripping tags."
-        else:
-            # Fallback if raw_xml() is not available (less likely for fb2 0.2.1)
-            # This would require more specific knowledge of the library's element structure.
-            # For now, we'll indicate that the primary method failed.
-            return "Error: FB2 library's body object does not support 'raw_xml()' for text extraction. Cannot extract text."
+                # If still not found after both attempts
+                return "Info: FB2 file has no body content or body tag is not standard."
+
+        
+        text_parts = []
+
+        
+        text_parts = []
+
+        # Inner recursive function to process each element and its children
+        def process_element(element, current_text_parts):
+            if element is None:
+                return
+
+            tag_name = etree.QName(element.tag).localname
+
+            if tag_name == 'p':
+                # Paragraphs: extract text, strip surrounding whitespace, append with a single newline.
+                # Text from inline tags (<em>, <strong>, <a>, etc.) is included.
+                para_text = element.xpath("string(.//text())") 
+                if para_text: 
+                    stripped_text = para_text.strip()
+                    if stripped_text:
+                        current_text_parts.append(stripped_text)
+                        current_text_parts.append('\n')
+            elif tag_name == 'title':
+                # Titles: extract text, strip, append with two newlines for separation.
+                title_text = element.xpath("string(.//text())")
+                if title_text:
+                    stripped_text = title_text.strip()
+                    if stripped_text:
+                        current_text_parts.append(stripped_text)
+                        current_text_parts.append('\n\n')
+            elif tag_name == 'section':
+                # Sections: manage spacing before and after their content.
+                # Ensure a double newline before starting a new section if not already present.
+                if current_text_parts and not "".join(current_text_parts[-2:]).endswith('\n\n'):
+                    if not "".join(current_text_parts[-1:]).endswith('\n'):
+                        current_text_parts.append('\n')
+                    current_text_parts.append('\n')
+
+                for child in element: # Recursively process children of the section
+                    process_element(child, current_text_parts)
+                
+                # Ensure a double newline after the section content if not already present.
+                if current_text_parts and not "".join(current_text_parts[-2:]).endswith('\n\n'):
+                    if not "".join(current_text_parts[-1:]).endswith('\n'):
+                        current_text_parts.append('\n')
+                    current_text_parts.append('\n')
+            elif tag_name == 'empty-line':
+                # Empty lines: append a single newline.
+                current_text_parts.append('\n')
+            elif tag_name in ['epigraph', 'cite', 'poem', 'subtitle']:
+                # Other block elements: extract text, strip, ensure double newline separation.
+                block_text = element.xpath("string(.//text())")
+                if block_text:
+                    stripped_text = block_text.strip()
+                    if stripped_text:
+                        if current_text_parts and not "".join(current_text_parts[-2:]).endswith('\n\n'):
+                            if not "".join(current_text_parts[-1:]).endswith('\n'): current_text_parts.append('\n')
+                            current_text_parts.append('\n')
+                        
+                        current_text_parts.append(stripped_text)
+                        current_text_parts.append('\n\n')
+            else:
+                # Default: For other elements (e.g., <body> itself, or other containers),
+                # recursively process their children without adding specific formatting at this level.
+                for child in element:
+                    process_element(child, current_text_parts)
+
+        # Start the recursive processing from the found <body> element
+        process_element(body_element, text_parts)
+
+        # Join all collected text parts
+        extracted_text = "".join(text_parts)
+
+        # Normalize newlines: replace sequences of 3 or more newlines with exactly two.
+        # Also, strip any leading/trailing whitespace from the final text.
+        if extracted_text:
+            extracted_text = re.sub(r'\n{3,}', '\n\n', extracted_text)
+            extracted_text = extracted_text.strip() 
+
+        if not extracted_text: # If after all processing, the text is empty
+            return "Info: FB2 body was found, but no text content was extracted from it."
+        return extracted_text
 
     except FileNotFoundError:
-        return "Error: FB2 file not found at path: " + filepath
+        return f"Error: FB2 file not found at path: {filepath}"
+    except etree.XMLSyntaxError as e:
+        return f"Error: Invalid or corrupted FB2 file. XMLSyntaxError: {e}"
+    except ImportError:
+        # This handles the case where lxml is not installed, though it should be.
+        return "Error: lxml library not found. Please install it (e.g., pip install lxml)."
     except Exception as e:
-        # Catching a broader range of exceptions that might occur during parsing
-        # (e.g., XML parsing errors within the fb2 library, unexpected file structure).
+        print("\n--- Traceback for unexpected error in extract_text_from_fb2 ---", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
+        print("--- End Traceback ---", file=sys.stderr)
         return f"An unexpected error occurred during FB2 parsing: {e}"
 
 def extract_text_from_pdf(filepath):

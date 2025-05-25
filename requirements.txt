@@ -3,6 +3,7 @@ PyPDF2==3.0.1
 gTTS==2.5.4
 BeautifulSoup4==4.13.4
 lxml==5.4.0
+FB2==0.2.1 # Required by the project, though not directly used in FB2 parsing logic now
 # For test suite (creating sample PDFs)
 reportlab==4.4.1
 Flask

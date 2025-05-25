@@ -4,7 +4,8 @@ Morthy is a command-line tool to convert book files (currently EPUB and PDF) int
 
 ## Features
 
-*   Supports EPUB (.epub) and PDF (.pdf) file formats.
+*   Supports EPUB (.epub), PDF (.pdf), and FB2 (.fb2) file formats.
+*   Extracts text preserving basic paragraph and section structure (especially for FB2).
 *   Converts extracted text to speech using Google Text-to-Speech (gTTS).
 *   Allows specifying output MP3 filename.
 *   Allows specifying the language for TTS.
@@ -19,8 +20,9 @@ The following Python libraries are required:
 *   `PyPDF2>=3.0.1` (for PDF parsing)
 *   `gTTS>=2.5.4` (for Text-to-Speech)
 *   `BeautifulSoup4>=4.13.4` (for HTML processing in EPUBs)
-*   `lxml>=5.4.0` (XML processing, often a dependency for EbookLib)
+*   `lxml>=5.4.0` (for XML processing, including FB2 parsing)
 *   `reportlab>=4.4.1` (for creating sample PDFs in the test suite)
+*   `FB2==0.2.1` (listed in requirements, though current FB2 parsing relies on lxml)
 
 ## Installation
 
@@ -43,7 +45,7 @@ python main.py <input_file> [--output_file <output_name.mp3>] [--lang <language_
 
 **Arguments:**
 
-*   `input_file`: (Required) Path to the input book file. Supported formats: `.epub`, `.pdf`.
+*   `input_file`: (Required) Path to the input book file. Supported formats: `.epub`, `.pdf`, `.fb2`.
 *   `--output_file`: (Optional) Desired name for the output MP3 file. If not provided, it defaults to the input file name with an `.mp3` extension (e.g., `mybook.epub` becomes `mybook.mp3`).
 *   `--lang`: (Optional) Language code for the text-to-speech conversion (e.g., 'en' for English, 'es' for Spanish). Defaults to 'en'.
 
@@ -60,79 +62,17 @@ python main.py <input_file> [--output_file <output_name.mp3>] [--lang <language_
     python main.py "My Document.pdf" --output_file "audio_doc.mp3" --lang es
     ```
 
-## Running the Web Application
-
-This project also includes a web interface for converting books to audiobooks.
-
-1.  **Install Dependencies:**
-    Ensure all dependencies, including Flask (which is now part of `requirements.txt`), are installed:
+3.  **Convert an FB2 file with default settings:**
     ```bash
-    pip install -r requirements.txt
+    python main.py "story.fb2"
     ```
-
-2.  **Run the Web Application:**
-    Navigate to the project's root directory and run:
-    ```bash
-    python web_app.py
-    ```
-
-3.  **Access the Application:**
-    Open your web browser and go to:
-    ```
-    http://127.0.0.1:5000/
-    ```
-
-You can then upload your book files (supported formats: EPUB, PDF, FB2) through the web interface to convert them into audio.
+    *(Output will be `story.mp3`)*
 
 **Supported Formats:**
 
 *   EPUB (.epub)
 *   PDF (.pdf)
-
-*Note: FB2 (.fb2) support was initially planned and has partial implementation in `parser.py` but is currently non-functional due to unresolved library import issues for the `fb2` package. It is considered a feature for future improvement.*
-
-## New React Frontend (Vite + Tailwind + shadcn/ui)
-
-This project now includes a modern React frontend application built with Vite, Tailwind CSS, and shadcn/ui components.
-
-### Frontend Setup and Usage
-
-To run the new React frontend, follow these steps:
-
-1.  **Navigate to the frontend directory:**
-    Open your terminal and change to the frontend project's directory:
-    ```bash
-    cd frontend/vite-react-app
-    ```
-
-2.  **Install Dependencies:**
-    If you haven't already, or if dependencies have changed, install the necessary Node.js packages:
-    ```bash
-    npm install
-    ```
-    *Note: If you encounter peer dependency issues, especially with React 19, you might need to use the `--legacy-peer-deps` flag:*
-    ```bash
-    npm install --legacy-peer-deps
-    ```
-
-3.  **Run the Development Server:**
-    Once the dependencies are installed, you can start the Vite development server:
-    ```bash
-    npm run dev
-    ```
-    This command will typically start the server and make the application available at `http://localhost:5173` (the port may vary if 5173 is in use). Your terminal will display the correct address.
-
-4.  **Access the Application:**
-    Open your web browser and navigate to the address shown in your terminal (e.g., `http://localhost:5173`).
-
-### Technology Stack
-
-The frontend application utilizes the following technologies:
-
-*   **React:** A JavaScript library for building user interfaces.
-*   **Vite:** A fast build tool and development server for modern web projects.
-*   **Tailwind CSS:** A utility-first CSS framework for rapid UI development.
-*   **shadcn/ui:** A collection of beautifully designed, accessible, and customizable React components.
+*   FB2 (.fb2) - Parsed using `lxml`.
 
 ## Error Handling
 
