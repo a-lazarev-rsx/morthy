@@ -1,3 +1,35 @@
+# Frontend Test Coverage Audit - 2025-06-05
+
+## Summary
+- Added tests for `App.tsx` and `main.tsx`.
+- Achieved 100% test coverage for `App.tsx`, `main.tsx`, `components/ui/button.tsx`, `components/ui/card.tsx`, and `lib/utils.ts`.
+- Overall frontend code coverage significantly improved.
+
+## Coverage Report
+
+```
+-------------------|---------|----------|---------|---------|-------------------
+File               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s
+-------------------|---------|----------|---------|---------|-------------------
+All files          |   55.76 |    71.42 |      50 |   55.76 |
+ vite-react-app    |       0 |        0 |       0 |       0 |
+  ...css.config.js |       0 |        0 |       0 |       0 | 1-6
+  ...ind.config.js |       0 |        0 |       0 |       0 | 1-86
+ ...-react-app/src |     100 |      100 |     100 |     100 |
+  App.tsx          |     100 |      100 |     100 |     100 |
+  main.tsx         |     100 |      100 |     100 |     100 |
+ .../components/ui |     100 |      100 |     100 |     100 |
+  button.tsx       |     100 |      100 |     100 |     100 |
+  card.tsx         |     100 |      100 |     100 |     100 |
+ ...ct-app/src/lib |     100 |      100 |     100 |     100 |
+  utils.ts         |     100 |      100 |     100 |     100 |
+-------------------|---------|----------|---------|---------|-------------------
+```
+
+**Note:** Configuration files (`postcss.config.js`, `tailwind.config.js`) are not included in the coverage metrics for application logic.
+
+---
+*(Existing content of TESTING_COVERAGE.md will be below this line)*
 # Test Coverage Documentation for Morthy Audiobook Generator
 
 This document outlines the current state of test coverage for the Morthy Audiobook Generator, identifies gaps, and proposes necessary additions to ensure robustness and reliability.
