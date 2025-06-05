@@ -45,5 +45,5 @@ def test_upload_unsupported_file_type(client):
     
     assert response.status_code == 200 # After following redirect to result page
     assert b"Error" in response.data # General error heading
-    assert b"Unsupported file type: '.txt'." in response.data
+    assert b"Unsupported file type: &#39;.txt&#39;." in response.data # Updated for HTML escaping
     assert b"Upload another file" in response.data
