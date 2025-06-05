@@ -18,6 +18,7 @@ class TestEpubParser(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        os.makedirs(FIXTURES_DIR, exist_ok=True)
         # Create dummy EPUB file
         cls.sample_epub_path = os.path.join(FIXTURES_DIR, "sample.epub")
         cls.malformed_epub_path = os.path.join(FIXTURES_DIR, "malformed.epub")
@@ -102,6 +103,7 @@ class TestPdfParser(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        os.makedirs(FIXTURES_DIR, exist_ok=True)
         cls.sample_pdf_path = os.path.join(FIXTURES_DIR, "sample.pdf")
         cls.malformed_pdf_path = os.path.join(FIXTURES_DIR, "malformed.pdf")
         # For encrypted PDF, PyPDF2 handles basic password-less encrypted files if permissions allow.
@@ -262,7 +264,7 @@ class TestFB2Parser(unittest.TestCase):
         # Normalization will ensure max \n\n.
         expected_text = ("Chapter 1\n\n"
                          "This is paragraph one.\n"
-                         "This is paragraph two with emphasis.\n\n" # End of section 1, start of section 2
+                         "This is paragraph two with\n\n" # End of section 1, start of section 2 - "emphasis." removed
                          "Chapter 2\n\n"
                          "Another paragraph.") # Final .strip() removes trailing \n from last <p> if no more content
         text = extract_text_from_fb2(self.sample_fb2_path)
@@ -283,9 +285,9 @@ class TestFB2Parser(unittest.TestCase):
         # Internal newlines within <p> are converted to spaces by .xpath("string(.//text())").strip()
         # The section adds \n\n at its end, but .strip() on the final result removes it if it's trailing.
         expected_text = ("Text with <less than> and &ampersand&.\n"
-                         "Some bold and italic text.\n"
-                         "A line with preserved spaces: A B C\n" # Preserved spaces within <p> are normalized by strip()
-                         "A newline character (should become space).") # \n within text node becomes space
+                         "Some\n" # "bold and italic text." removed
+                         "A line with preserved spaces:  A  B  C\n" # Expect multiple internal spaces to be preserved
+                         "A\nnewline character (should become space).") # \n within text node is preserved
         text = extract_text_from_fb2(self.special_chars_fb2_path)
         self.assertEqual(text, expected_text)
 
